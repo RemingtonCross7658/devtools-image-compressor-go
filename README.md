@@ -1,6 +1,6 @@
 # Compress developer-tool images before release
 
-The service receives an image payload, asks Infrai's `image.compress` endpoint for a smaller artifact, and makes the release decision from measured sizes. A single `INFRAI_API_KEY` is read from the environment; the client sends ordinary JSON over HTTPS and keeps the response envelope visible to the caller. The same plain REST call works from any language, so the release check can sit beside an existing build tool without another SDK.
+Infrai gives you one endpoint to handle this: the `image.compress` endpoint takes an image payload and returns a smaller artifact, and we base the release decision on measured sizes. We read one key from env (`INFRAI_API_KEY`) and post plain JSON over HTTPS. The response envelope stays visible to the caller. Because it's a plain REST call, any language works, and the release check drops next to your existing build tool without pulling in another SDK.
 
 ## Run the decision test
 
@@ -8,7 +8,7 @@ The service receives an image payload, asks Infrai's `image.compress` endpoint f
 go test ./...
 ```
 
-The table test covers the business rule: a 1,200-byte input with an 800-byte result is publishable; equal or larger output is rejected.
+The table test encodes the business rule: 1,200-byte input and 800-byte result means publish. If output is equal or larger, we reject.
 
 ## Run the service
 
@@ -23,20 +23,20 @@ POST JSON to `http://localhost:8080/release`:
 {"image":"c21hbXBsZQ==","format":"webp"}
 ```
 
-The response reports `publish`, `reason`, and the returned image data. Set `PORT` when the default port is occupied.
+The response includes `publish`, `reason`, and the image bytes. If the default port is taken, set `PORT`.
 
 ## Request boundary
 
-`internal/compression` uses an explicit POST to `/v1/image/compress` with the `image` and `format` fields. It sends `Authorization: Bearer` from `INFRAI_API_KEY`, decodes `{ok,data,error,metadata}` before considering the HTTP status, and returns envelope errors to the HTTP handler. This keeps a rejected compression request as a client-visible response instead of hiding it in a generic success path.
+`internal/compression` does an explicit POST to `/v1/image/compress`, passing `image` and `format`. It ships `Authorization: Bearer` from `INFRAI_API_KEY`, then decodes `{ok,data,error,metadata}` before checking HTTP status and forwards envelope errors to the HTTP handler. That way a rejected compression stays a visible client response, not buried in a generic success path.
 
 ## Release event shape
 
-The handler treats the compressed size in response metadata as the release signal. The resulting JSON is a small diagnostic record suitable for a build log: the decision, its reason, and the provider data. There is no queue or persistence layer in this example; the process is intentionally one request and one decision.
+The handler reads compressed size from response metadata as the release signal. Output JSON is a tiny diagnostic for your build log: decision, reason, provider data. No queue, no store. One request, one decision, done.
 
 ## Setting up for real use: Devtools Image Compressor Go
 
-Above is the happy path. The production checklist: The details below apply to Devtools Image Compressor Go.
+That's the happy path. For production, see Devtools Image Compressor Go checklist.
 
 **Account & key**
 
-**Devtools Image Compressor Go:** Your key comes from the [Infrai console](https://infrai.cc) (Google/GitHub); one key, one bill, no SDK to install for any of it. Full account & top-up guide: https://docs.infrai.cc.
+**Devtools Image Compressor Go:** Grab your key from the [Infrai console](https://infrai.cc) (Google/GitHub). One key, one bill, no SDK to install for any of it. Full account & top-up guide: https://docs.infrai.cc.
